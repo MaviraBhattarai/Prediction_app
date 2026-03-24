@@ -35,7 +35,7 @@ user_features = {
 st.subheader("Enter your information")
 user_input_data = {}
 for label, col_name in user_features.items():
-    user_input_data[col_name] = st.text_input(label, "0")  # default 0
+    user_input_data[col_name] = st.text_input(label, "")  # no default
 
 # Convert input to numeric
 user_input_df = pd.DataFrame([user_input_data]).apply(pd.to_numeric, errors='coerce').fillna(0)
