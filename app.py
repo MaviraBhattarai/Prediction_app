@@ -26,7 +26,7 @@ feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse',
 # Features we actually ask the user for (friendly label -> model column name)
 user_features = {
     "Age": "Age",
-    "Num of Pregnancies": "Num of pregnancies"
+    "Num of Pregnancies": "Num of pregnancies",
     "IUD (years)": "IUD (years)",
     "STDs": "STDs"
 }
