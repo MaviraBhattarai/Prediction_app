@@ -1,65 +1,78 @@
 import streamlit as st
 import joblib
 import pandas as pd
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
+import numpy as np
 
-st.title("Health Prediction App")
+st.title("Health Prediction App with Tabular + Image Input")
 
-# Load model and scaler
+# -----------------------------
+# Load models
+# -----------------------------
 with open("tabular_model.joblib", "rb") as f:
-    model = joblib.load(f)
-
+    tab_model = joblib.load(f)
 with open("scaler.joblib", "rb") as f:
     scaler = joblib.load(f)
 
-# All features used during training
-feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse', 
-                 'Num of pregnancies', 'Smokes', 'Smokes (years)', 'Smokes (packs/year)',
-                 'Hormonal Contraceptives', 'Hormonal Contraceptives (years)', 'IUD', 
-                 'IUD (years)', 'STDs', 'STDs (number)', 'STDs:condylomatosis',
-                 'STDs:cervical condylomatosis', 'STDs:vaginal condylomatosis',
-                 'STDs:vulvo-perineal condylomatosis', 'STDs:syphilis',
-                 'STDs:pelvic inflammatory disease', 'STDs:genital herpes',
-                 'STDs:molluscum contagiosum', 'STDs:AIDS', 'STDs:HIV',
-                 'STDs:Hepatitis B', 'STDs:HPV', 'STDs: Number of diagnosis',
-                 'STDs: Time since first diagnosis', 'STDs: Time since last diagnosis']
+cnn_model = load_model("cnn_model.h5")
 
-# Features we ask the user for (friendly label -> model column name)
-user_features = {
-    "Age": "Age",
-    "Number of sexual partners": "Number of sexual partners",
-    "First sexual intercourse": "First sexual intercourse",
-    "Num of pregnancies": "Num of pregnancies",
-    "Hormonal Contraceptives": "Hormonal Contraceptives",
-    "STDs: HIV": "STDs:HIV"
-}
+# -----------------------------
+# Tabular input
+# -----------------------------
+st.subheader("Enter your information (Tabular Data)")
 
-# Collect user input
-st.subheader("Enter your information")
+user_features = ["Age", "Number of sexual partners", "First sexual intercourse", 
+                 "Num of pregnancies", "Hormonal Contraceptives", "STDs:HIV"]
+
 user_input_data = {}
-for label, col_name in user_features.items():
-    user_input_data[col_name] = st.text_input(label, "")  # no default
+for feat in user_features:
+    user_input_data[feat] = st.text_input(feat, "")
 
-# Convert input to numeric
-user_input_df = pd.DataFrame([user_input_data]).apply(pd.to_numeric, errors='coerce').fillna(0)
-
-# Fill missing features with 0 so all features are present
+# Process tabular input
+feature_names = tab_model.feature_names_in_
+tab_input_df = pd.DataFrame([user_input_data]).apply(pd.to_numeric, errors='coerce').fillna(0)
 for feature in feature_names:
-    if feature not in user_input_df.columns:
-        user_input_df[feature] = 0
-
-# Reorder columns to match training
-user_input_df = user_input_df[feature_names]
+    if feature not in tab_input_df.columns:
+        tab_input_df[feature] = 0
+tab_input_df = tab_input_df[feature_names]
 
 # Scale and predict
-input_scaled = scaler.transform(user_input_df)
-prediction = model.predict(input_scaled)
-prediction_proba = model.predict_proba(input_scaled)
+tab_scaled = scaler.transform(tab_input_df)
+tab_pred_proba = tab_model.predict_proba(tab_scaled)[0][1]  # probability of class 1
 
-# Show prediction probability
-st.subheader("Prediction Probability")
-st.write(prediction_proba[0])
+# -----------------------------
+# Image input
+# -----------------------------
+st.subheader("Upload your image for CNN prediction")
+uploaded_file = st.file_uploader("Choose an image...", type=["png", "jpg", "jpeg"])
+cnn_pred_proba = None
+if uploaded_file is not None:
+    img = image.load_img(uploaded_file, target_size=(224,224))
+    img_array = image.img_to_array(img)/255.0
+    img_array = np.expand_dims(img_array, axis=0)
 
-# Determine risk based on probability
-risk = "High Risk" if prediction_proba[0][1] > 0.45 else "Low Risk"
-st.subheader("Risk Assessment")
-st.write(risk)
+    cnn_pred_proba = cnn_model.predict(img_array)[0][0]
+    st.image(img, caption="Uploaded Image", use_column_width=True)
+
+# -----------------------------
+# Combine predictions
+# -----------------------------
+if cnn_pred_proba is not None:
+    final_prob = (tab_pred_proba + cnn_pred_proba) / 2
+else:
+    final_prob = tab_pred_proba
+
+final_risk = "High Risk" if final_prob > 0.45 else "Low Risk"
+
+# -----------------------------
+# Show results
+# -----------------------------
+st.subheader("Final Risk Prediction")
+st.write(f"Overall Risk: {final_risk} ({final_prob:.2f})")
+
+# Optional: show individual model probabilities
+st.subheader("Individual Model Probabilities")
+st.write(f"Tabular Model Probability: {tab_pred_proba:.2f}")
+if cnn_pred_proba is not None:
+    st.write(f"CNN Model Probability: {cnn_pred_proba:.2f}")
