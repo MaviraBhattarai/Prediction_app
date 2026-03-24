@@ -5,10 +5,10 @@ import pandas as pd
 st.title("Health Prediction App")
 
 # Load model and scaler
-with open("tabular_model.pkl", "rb") as f:
+with open("tabular_model.joblib", "rb") as f:
     model = pickle.load(f)
 
-with open("scaler.pkl", "rb") as f:
+with open("scaler.joblib", "rb") as f:
     scaler = pickle.load(f)
 
 # All features used during training
