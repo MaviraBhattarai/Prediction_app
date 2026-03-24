@@ -2,7 +2,6 @@ import streamlit as st
 import pickle
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
 
 st.title("Health Prediction App")
 
@@ -26,13 +25,18 @@ feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse',
                  'STDs: Time since first diagnosis', 'STDs: Time since last diagnosis']
 
 # Features we want user to input
-user_features = ["Age", "IUD", "STDs", "Num of pregnancies"]
+user_features = {
+    "Age": "Age",
+    "IUD": "IUD",
+    "STDs": "STDs",
+    "Num of pregnancies": "Number of Pregnancies"
+}
 
 # Get user input
 data = {}
 st.subheader("Enter your information")
-for feature in user_features:
-    data[feature] = st.text_input(feature, "0")  # default 0
+for col_name, label in user_features.items():
+    data[col_name] = st.text_input(label, "0")  # default 0
 
 # Convert to numeric
 user_input = pd.DataFrame([data]).apply(pd.to_numeric, errors='coerce').fillna(0)
