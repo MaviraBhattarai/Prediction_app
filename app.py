@@ -89,7 +89,7 @@ if uploaded_file is not None:
     image_tensor = transform(image).unsqueeze(0)  # add batch dimension
 
     # Load CNN model
-    cnn_model = torch.load("cnn_model.pth", map_location=torch.device("cpu"))
+   cnn_model = torch.load("cnn_model.pth", map_location=torch.device('cpu'), weights_only=False)
     cnn_model.eval()
 
     with torch.no_grad():
