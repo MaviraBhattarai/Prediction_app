@@ -1,15 +1,12 @@
 import streamlit as st
-import pickle
+import joblib
 import pandas as pd
 
 st.title("Health Prediction App")
 
-# Load model and scaler
-with open("tabular_model.joblib", "rb") as f:
-    model = pickle.load(f)
-
-with open("scaler.joblib", "rb") as f:
-    scaler = pickle.load(f)
+# Load model and scaler using joblib
+model = joblib.load("tabular_model.joblib")
+scaler = joblib.load("scaler.joblib")
 
 # All features used during training
 feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse', 
