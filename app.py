@@ -23,36 +23,37 @@ feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse',
                  'STDs:Hepatitis B', 'STDs:HPV', 'STDs: Number of diagnosis',
                  'STDs: Time since first diagnosis', 'STDs: Time since last diagnosis']
 
-# Features we want user to input (friendly label -> model column name)
+# Features we actually ask the user for (friendly label -> model column name)
 user_features = {
     "Age": "Age",
-    "IUD": "IUD",
-    "STDs": "STDs",
-    "Number of Pregnancies": "Num of pregnancies"  # <-- IMPORTANT: match training
+    "Num of Pregnancies": "Num of pregnancies"
+    "IUD (years)": "IUD (years)",
+    "STDs": "STDs"
 }
 
-# Collect input
-data = {}
+# Collect user input
 st.subheader("Enter your information")
+user_input_data = {}
 for label, col_name in user_features.items():
-    data[col_name] = st.text_input(label, "0")  # default 0
+    user_input_data[col_name] = st.text_input(label, "0")  # default 0
 
-# Convert to numeric
-user_input = pd.DataFrame([data]).apply(pd.to_numeric, errors='coerce').fillna(0)
+# Convert input to numeric
+user_input_df = pd.DataFrame([user_input_data]).apply(pd.to_numeric, errors='coerce').fillna(0)
 
-# Fill missing features with 0
+# Fill missing features with 0 so all features are present
 for feature in feature_names:
-    if feature not in user_input.columns:
-        user_input[feature] = 0
+    if feature not in user_input_df.columns:
+        user_input_df[feature] = 0
 
 # Reorder columns to match training
-user_input = user_input[feature_names]
+user_input_df = user_input_df[feature_names]
 
 # Scale and predict
-input_scaled = scaler.transform(user_input)
+input_scaled = scaler.transform(user_input_df)
 prediction = model.predict(input_scaled)
 prediction_proba = model.predict_proba(input_scaled)
 
+# Show results
 st.subheader("Prediction")
 st.write(prediction[0])
 
