@@ -1,12 +1,16 @@
 import streamlit as st
-import joblib
+import pickle
 import pandas as pd
+from joblib import load
 
 st.title("Health Prediction App")
 
 # Load model and scaler
-model = joblib.load("tabular_model.joblib")
-scaler = joblib.load("scaler.joblib")
+with open("tabular_model.joblib", "rb") as f:
+    model = load(f)
+
+with open("scaler.joblib", "rb") as f:
+    scaler = load(f)
 
 # All features used during training
 feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse', 
@@ -20,22 +24,24 @@ feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse',
                  'STDs:Hepatitis B', 'STDs:HPV', 'STDs: Number of diagnosis',
                  'STDs: Time since first diagnosis', 'STDs: Time since last diagnosis']
 
-# Features we ask the user for (friendly label -> model column name)
+# Features we ask the user for
 user_features = {
     "Age": "Age",
+    "Number of sexual partners": "Number of sexual partners",
+    "First sexual intercourse": "First sexual intercourse",
     "Num of pregnancies": "Num of pregnancies",
-    "IUD (years)": "IUD (years)",
-    "STDs": "STDs"
+    "Hormonal Contraceptives": "Hormonal Contraceptives",
+    "STDs:HIV": "STDs:HIV"
 }
 
 # Collect user input
 st.subheader("Enter your information")
 user_input_data = {}
 for label, col_name in user_features.items():
-    user_input_data[col_name] = st.text_input(label, "")  # no default
+    user_input_data[col_name] = st.number_input(label, min_value=0, value=0)
 
-# Convert input to numeric
-user_input_df = pd.DataFrame([user_input_data]).apply(pd.to_numeric, errors='coerce').fillna(0)
+# Convert input to DataFrame
+user_input_df = pd.DataFrame([user_input_data])
 
 # Fill missing features with 0 so all features are present
 for feature in feature_names:
@@ -50,15 +56,10 @@ input_scaled = scaler.transform(user_input_df)
 prediction = model.predict(input_scaled)
 prediction_proba = model.predict_proba(input_scaled)
 
-# Convert prediction to friendly label
-risk_label = "High Risk" if prediction[0] == 1 else "Low Risk"
-
-# Show results
+# Show results as High/Low Risk
 st.subheader("Prediction")
-st.write(risk_label)
+risk = "High Risk" if prediction[0] == 1 else "Low Risk"
+st.write(risk)
 
 st.subheader("Prediction Probability")
-st.write({
-    "Low Risk": round(prediction_proba[0][0], 2),
-    "High Risk": round(prediction_proba[0][1], 2)
-})
+st.write(prediction_proba[0])
