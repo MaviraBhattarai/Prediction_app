@@ -1,6 +1,5 @@
 import streamlit as st
 import pickle
-import numpy as np
 import pandas as pd
 
 st.title("Health Prediction App")
@@ -12,7 +11,7 @@ with open("tabular_model.pkl", "rb") as f:
 with open("scaler.pkl", "rb") as f:
     scaler = pickle.load(f)
 
-# All feature names from training
+# All features used during training
 feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse', 
                  'Num of pregnancies', 'Smokes', 'Smokes (years)', 'Smokes (packs/year)',
                  'Hormonal Contraceptives', 'Hormonal Contraceptives (years)', 'IUD', 
@@ -24,18 +23,18 @@ feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse',
                  'STDs:Hepatitis B', 'STDs:HPV', 'STDs: Number of diagnosis',
                  'STDs: Time since first diagnosis', 'STDs: Time since last diagnosis']
 
-# Features we want user to input
+# Features we want user to input (friendly label -> model column name)
 user_features = {
     "Age": "Age",
     "IUD": "IUD",
     "STDs": "STDs",
-    "Num of pregnancies": "Number of Pregnancies"
+    "Number of Pregnancies": "Num of pregnancies"  # <-- IMPORTANT: match training
 }
 
-# Get user input
+# Collect input
 data = {}
 st.subheader("Enter your information")
-for col_name, label in user_features.items():
+for label, col_name in user_features.items():
     data[col_name] = st.text_input(label, "0")  # default 0
 
 # Convert to numeric
@@ -49,10 +48,8 @@ for feature in feature_names:
 # Reorder columns to match training
 user_input = user_input[feature_names]
 
-# Scale input
+# Scale and predict
 input_scaled = scaler.transform(user_input)
-
-# Make prediction
 prediction = model.predict(input_scaled)
 prediction_proba = model.predict_proba(input_scaled)
 
