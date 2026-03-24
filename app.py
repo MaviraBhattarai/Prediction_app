@@ -2,37 +2,25 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-st.set_page_config(page_title="Simple Tabular Predictor", layout="centered")
-st.title("Tabular Data Prediction App")
+st.title("Simple Prediction App")
 
-# =========================
-# Load Models
-# =========================
-# Make sure you've uploaded these to Streamlit Cloud
+# Load scaler and model
 scaler = joblib.load("scaler.joblib")
 tabular_model = joblib.load("tabular_model.joblib")
 
-# =========================
-# User Input
-# =========================
-st.header("Enter Input Values")
+# Features to ask from the user
+feature_names = ["Age", "IUD", "STDs", "Number of Pregnancies"]
 
-# Replace with your actual feature names
-feature_names = ["feature1", "feature2", "feature3"]  
+# Collect user input
 user_input = {}
-
 for feature in feature_names:
-    user_input[feature] = st.number_input(f"Enter {feature}:")
+    user_input[feature] = st.number_input(f"Enter {feature}:", value=0, min_value=0)
 
 # Convert input to DataFrame
 input_df = pd.DataFrame([user_input])
 
-# Scale input
+# Scale and predict
 input_scaled = scaler.transform(input_df)
-
-# =========================
-# Make Prediction
-# =========================
 prediction = tabular_model.predict(input_scaled)
 
 st.subheader("Prediction Result")
