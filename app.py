@@ -1,52 +1,59 @@
 import streamlit as st
 import pickle
+import numpy as np
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
-# Load your trained model and scaler
+st.title("Health Prediction App")
+
+# Load model and scaler
 with open("tabular_model.pkl", "rb") as f:
     model = pickle.load(f)
 
 with open("scaler.pkl", "rb") as f:
     scaler = pickle.load(f)
 
-st.title("Prediction App")
+# All feature names from training
+feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse', 
+                 'Num of pregnancies', 'Smokes', 'Smokes (years)', 'Smokes (packs/year)',
+                 'Hormonal Contraceptives', 'Hormonal Contraceptives (years)', 'IUD', 
+                 'IUD (years)', 'STDs', 'STDs (number)', 'STDs:condylomatosis',
+                 'STDs:cervical condylomatosis', 'STDs:vaginal condylomatosis',
+                 'STDs:vulvo-perineal condylomatosis', 'STDs:syphilis',
+                 'STDs:pelvic inflammatory disease', 'STDs:genital herpes',
+                 'STDs:molluscum contagiosum', 'STDs:AIDS', 'STDs:HIV',
+                 'STDs:Hepatitis B', 'STDs:HPV', 'STDs: Number of diagnosis',
+                 'STDs: Time since first diagnosis', 'STDs: Time since last diagnosis']
 
-# Features to ask from the user
-user_features = {
-    "Age": st.number_input("Age", min_value=0, max_value=120, value=25),
-    "IUD (years)": st.number_input("IUD (years)", min_value=0, max_value=50, value=0),
-    "STDs": st.selectbox("STDs", [0, 1]),
-    "Num of pregnancies": st.number_input("Num of pregnancies", min_value=0, max_value=20, value=0)
-}
+# Features we want user to input
+user_features = ["Age", "IUD", "STDs", "Num of pregnancies"]
 
-# All features that the model expects
-model_features = [
-    "Age",
-    "First sexual intercourse",
-    "Hormonal Contraceptives",
-    "Hormonal Contraceptives (years)",
-    "IUD (years)",
-    "Num of pregnancies",
-    "STDs",
-    "Other_feature_1",
-    "Other_feature_2"
-]
+# Get user input
+data = {}
+st.subheader("Enter your information")
+for feature in user_features:
+    data[feature] = st.text_input(feature, "0")  # default 0
 
-# Create input DataFrame with defaults
-input_data = {}
-for feat in model_features:
-    if feat in user_features:
-        input_data[feat] = [user_features[feat]]
-    else:
-        # Fill missing features with 0 or default value
-        input_data[feat] = [0]
+# Convert to numeric
+user_input = pd.DataFrame([data]).apply(pd.to_numeric, errors='coerce').fillna(0)
 
-df = pd.DataFrame(input_data)
+# Fill missing features with 0
+for feature in feature_names:
+    if feature not in user_input.columns:
+        user_input[feature] = 0
 
-# Scale features if scaler is used
-df_scaled = scaler.transform(df)
+# Reorder columns to match training
+user_input = user_input[feature_names]
 
-# Prediction
-prediction = model.predict(df_scaled)
+# Scale input
+input_scaled = scaler.transform(user_input)
 
-st.write(f"Prediction: {prediction[0]}")
+# Make prediction
+prediction = model.predict(input_scaled)
+prediction_proba = model.predict_proba(input_scaled)
+
+st.subheader("Prediction")
+st.write(prediction[0])
+
+st.subheader("Prediction Probability")
+st.write(prediction_proba[0])
