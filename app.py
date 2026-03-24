@@ -58,8 +58,9 @@ prediction_proba = model.predict_proba(input_scaled)
 
 # Show results as High/Low Risk
 st.subheader("Prediction")
-risk = "High Risk" if prediction[0] == 1 else "Low Risk"
-st.write(risk)
+# Determine risk based on probability threshold
+risk = "High Risk" if prediction_proba[0][1] > 0.45 else "Low Risk"
 
-st.subheader("Prediction Probability")
-st.write(prediction_proba[0])
+# Show the risk
+st.subheader("Risk Score")
+st.write(risk)
