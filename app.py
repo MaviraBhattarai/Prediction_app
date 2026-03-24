@@ -1,27 +1,52 @@
 import streamlit as st
+import pickle
 import pandas as pd
-import joblib
 
-st.title("Simple Prediction App")
+# Load your trained model and scaler
+with open("tabular_model.pkl", "rb") as f:
+    model = pickle.load(f)
 
-# Load scaler and model
-scaler = joblib.load("scaler.joblib")
-tabular_model = joblib.load("tabular_model.joblib")
+with open("scaler.pkl", "rb") as f:
+    scaler = pickle.load(f)
+
+st.title("Prediction App")
 
 # Features to ask from the user
-feature_names = ["Age", "IUD (years)", "STDs", "Num of pregnancies"]
+user_features = {
+    "Age": st.number_input("Age", min_value=0, max_value=120, value=25),
+    "IUD (years)": st.number_input("IUD (years)", min_value=0, max_value=50, value=0),
+    "STDs": st.selectbox("STDs", [0, 1]),
+    "Num of pregnancies": st.number_input("Num of pregnancies", min_value=0, max_value=20, value=0)
+}
 
-# Collect user input
-user_input = {}
-for feature in feature_names:
-    user_input[feature] = st.number_input(f"Enter {feature}:", value=0, min_value=0)
+# All features that the model expects
+model_features = [
+    "Age",
+    "First sexual intercourse",
+    "Hormonal Contraceptives",
+    "Hormonal Contraceptives (years)",
+    "IUD (years)",
+    "Num of pregnancies",
+    "STDs",
+    "Other_feature_1",
+    "Other_feature_2"
+]
 
-# Convert input to DataFrame
-input_df = pd.DataFrame([user_input])
+# Create input DataFrame with defaults
+input_data = {}
+for feat in model_features:
+    if feat in user_features:
+        input_data[feat] = [user_features[feat]]
+    else:
+        # Fill missing features with 0 or default value
+        input_data[feat] = [0]
 
-# Scale and predict
-input_scaled = scaler.transform(input_df)
-prediction = tabular_model.predict(input_scaled)
+df = pd.DataFrame(input_data)
 
-st.subheader("Prediction Result")
-st.write(prediction[0])
+# Scale features if scaler is used
+df_scaled = scaler.transform(df)
+
+# Prediction
+prediction = model.predict(df_scaled)
+
+st.write(f"Prediction: {prediction[0]}")
