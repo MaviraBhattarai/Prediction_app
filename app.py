@@ -9,7 +9,7 @@ scaler = joblib.load("scaler.joblib")
 tabular_model = joblib.load("tabular_model.joblib")
 
 # Features to ask from the user
-feature_names = ["Age", "IUD", "STDs", "Number of Pregnancies"]
+feature_names = ["Age", "IUD", "STDs", "Num of Pregnancies"]
 
 # Collect user input
 user_input = {}
