@@ -8,10 +8,16 @@ from torchvision import models, transforms
 from PIL import Image
 import joblib
 
-st.title("Cervical Cancer Risk Prediction App")
+# =========================
+# PAGE CONFIG
+# =========================
+st.set_page_config(page_title="Cancer Risk Predictor", layout="wide")
+
+st.title("🧬 Cervical Cancer Risk Prediction System")
+st.markdown("This app predicts cancer risk using **clinical data + Pap smear images**.")
 
 # =========================
-# LOAD TABULAR MODEL
+# LOAD MODELS
 # =========================
 @st.cache_resource
 def load_tabular():
@@ -19,11 +25,6 @@ def load_tabular():
     scaler = joblib.load("scaler.joblib")
     return model, scaler
 
-tabular_model, scaler = load_tabular()
-
-# =========================
-# LOAD CNN MODEL (FIXED)
-# =========================
 @st.cache_resource
 def load_cnn():
     model = models.efficientnet_b0(pretrained=False)
@@ -35,13 +36,13 @@ def load_cnn():
 
     model.load_state_dict(torch.load("cnn_weights.pth", map_location="cpu"))
     model.eval()
-
     return model
 
+tabular_model, scaler = load_tabular()
 cnn_model = load_cnn()
 
 # =========================
-# ALL FEATURES (DO NOT CHANGE)
+# FEATURE LIST
 # =========================
 feature_names = [
     'Age', 'Number of sexual partners', 'First sexual intercourse', 
@@ -57,9 +58,9 @@ feature_names = [
 ]
 
 # =========================
-# USER INPUT (ONLY FEW)
+# SIDEBAR INPUTS
 # =========================
-st.subheader("Enter Patient Information")
+st.sidebar.header("📋 Patient Information")
 
 user_features = {
     "Age": "Age",
@@ -72,70 +73,83 @@ user_features = {
 
 user_data = {}
 for label, col in user_features.items():
-    user_data[col] = st.number_input(label, min_value=0, value=0)
-
-# Convert input
-input_df = pd.DataFrame([user_data])
-
-# Fill missing features
-for feature in feature_names:
-    if feature not in input_df.columns:
-        input_df[feature] = 0
-
-# Reorder columns
-input_df = input_df[feature_names]
+    user_data[col] = st.sidebar.number_input(label, min_value=0, value=0)
 
 # =========================
-# TABULAR PREDICTION
+# IMAGE UPLOAD
 # =========================
-scaled_input = scaler.transform(input_df)
-tabular_prob = tabular_model.predict_proba(scaled_input)[0][1]
-
-st.subheader("Tabular Model")
-st.write(f"Probability: {tabular_prob:.2f}")
+st.sidebar.header("🖼️ Upload Image")
+uploaded_file = st.sidebar.file_uploader("Upload Pap Smear Image", type=["jpg", "jpeg", "png"])
 
 # =========================
-# CNN IMAGE INPUT
+# PREDICT BUTTON
 # =========================
-st.subheader("Upload Pap Smear Image")
+if st.sidebar.button("🔍 Predict Risk"):
 
-uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
+    with st.spinner("Analyzing patient data and image..."):
 
-cnn_prob = 0.0  # default if no image
+        # -------------------------
+        # Prepare Tabular Data
+        # -------------------------
+        input_df = pd.DataFrame([user_data])
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+        for feature in feature_names:
+            if feature not in input_df.columns:
+                input_df[feature] = 0
 
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225])
-    ])
+        input_df = input_df[feature_names]
 
-    image_tensor = transform(image).unsqueeze(0)
+        scaled_input = scaler.transform(input_df)
+        tabular_prob = tabular_model.predict_proba(scaled_input)[0][1]
 
-    with torch.no_grad():
-        output = cnn_model(image_tensor)
-        probs = F.softmax(output, dim=1)
+        # -------------------------
+        # CNN Prediction
+        # -------------------------
+        cnn_prob = 0.0
 
-        # cancer-related probability
-        cnn_prob = (probs[:, 0] + probs[:, 1]).item()
+        col1, col2 = st.columns(2)
 
-    st.subheader("CNN Model")
-    st.write(f"Probability: {cnn_prob:.2f}")
+        if uploaded_file is not None:
+            image = Image.open(uploaded_file).convert("RGB")
 
-# =========================
-# FINAL FUSION
-# =========================
-final_score = 0.6 * tabular_prob + 0.4 * cnn_prob
+            transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406],
+                                     [0.229, 0.224, 0.225])
+            ])
 
-if final_score > 0.45:
-    risk = "🔴 High Risk"
-else:
-    risk = "🟢 Low Risk"
+            image_tensor = transform(image).unsqueeze(0)
 
-st.subheader("Final Prediction")
-st.write(risk)
-st.write(f"Final Risk Score: {final_score:.2f}")
+            with torch.no_grad():
+                output = cnn_model(image_tensor)
+                probs = F.softmax(output, dim=1)
+                cnn_prob = (probs[:, 0] + probs[:, 1]).item()
+
+            # Show image
+            with col1:
+                st.image(image, caption="Uploaded Image", use_container_width=True)
+
+        # -------------------------
+        # FINAL SCORE
+        # -------------------------
+        final_score = 0.6 * tabular_prob + 0.4 * cnn_prob
+
+        # -------------------------
+        # DISPLAY RESULTS
+        # -------------------------
+        with col2:
+            st.subheader("📊 Results")
+
+            st.metric("Tabular Probability", f"{tabular_prob:.2f}")
+            st.metric("CNN Probability", f"{cnn_prob:.2f}")
+            st.metric("Final Risk Score", f"{final_score:.2f}")
+
+            st.progress(int(final_score * 100))
+
+            if final_score > 0.45:
+                st.error("🔴 High Risk")
+            else:
+                st.success("🟢 Low Risk")
+
+        st.info("Prediction is based on combined clinical and image analysis.")
