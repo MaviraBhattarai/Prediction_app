@@ -11,7 +11,7 @@ import joblib
 st.title("Cervical Cancer Risk Prediction App")
 
 # =========================
-# Load Tabular Model
+# LOAD TABULAR MODEL
 # =========================
 @st.cache_resource
 def load_tabular():
@@ -22,7 +22,7 @@ def load_tabular():
 tabular_model, scaler = load_tabular()
 
 # =========================
-# Load CNN Model (EfficientNet)
+# LOAD CNN MODEL (FIXED)
 # =========================
 @st.cache_resource
 def load_cnn():
@@ -35,12 +35,13 @@ def load_cnn():
 
     model.load_state_dict(torch.load("cnn_weights.pth", map_location="cpu"))
     model.eval()
+
     return model
 
 cnn_model = load_cnn()
 
 # =========================
-# Feature List (IMPORTANT)
+# ALL FEATURES (DO NOT CHANGE)
 # =========================
 feature_names = [
     'Age', 'Number of sexual partners', 'First sexual intercourse', 
@@ -56,7 +57,7 @@ feature_names = [
 ]
 
 # =========================
-# User Input (only important ones)
+# USER INPUT (ONLY FEW)
 # =========================
 st.subheader("Enter Patient Information")
 
@@ -73,10 +74,10 @@ user_data = {}
 for label, col in user_features.items():
     user_data[col] = st.number_input(label, min_value=0, value=0)
 
-# Convert to DataFrame
+# Convert input
 input_df = pd.DataFrame([user_data])
 
-# Fill missing features with 0
+# Fill missing features
 for feature in feature_names:
     if feature not in input_df.columns:
         input_df[feature] = 0
@@ -85,22 +86,22 @@ for feature in feature_names:
 input_df = input_df[feature_names]
 
 # =========================
-# Tabular Prediction
+# TABULAR PREDICTION
 # =========================
 scaled_input = scaler.transform(input_df)
 tabular_prob = tabular_model.predict_proba(scaled_input)[0][1]
 
-st.subheader("Tabular Model Result")
+st.subheader("Tabular Model")
 st.write(f"Probability: {tabular_prob:.2f}")
 
 # =========================
-# CNN Prediction (Image)
+# CNN IMAGE INPUT
 # =========================
 st.subheader("Upload Pap Smear Image")
 
-uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
-cnn_prob = 0.0  # default
+cnn_prob = 0.0  # default if no image
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
@@ -119,19 +120,22 @@ if uploaded_file is not None:
         output = cnn_model(image_tensor)
         probs = F.softmax(output, dim=1)
 
-        # Cancer-related probability (same logic as your notebook)
+        # cancer-related probability
         cnn_prob = (probs[:, 0] + probs[:, 1]).item()
 
-    st.subheader("CNN Model Result")
+    st.subheader("CNN Model")
     st.write(f"Probability: {cnn_prob:.2f}")
 
 # =========================
-# FINAL MULTIMODAL PREDICTION
+# FINAL FUSION
 # =========================
 final_score = 0.6 * tabular_prob + 0.4 * cnn_prob
 
-risk = "High Risk" if final_score > 0.45 else "Low Risk"
+if final_score > 0.45:
+    risk = "🔴 High Risk"
+else:
+    risk = "🟢 Low Risk"
 
-st.subheader("Final Risk Prediction")
+st.subheader("Final Prediction")
 st.write(risk)
 st.write(f"Final Risk Score: {final_score:.2f}")
