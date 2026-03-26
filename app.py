@@ -1,111 +1,137 @@
 import streamlit as st
-import pickle
-import joblib
 import pandas as pd
+import numpy as np
 import torch
 import torch.nn as nn
-from torchvision import transforms
+import torch.nn.functional as F
+from torchvision import models, transforms
 from PIL import Image
-import numpy as np
+import joblib
 
-st.title("Health Prediction App with Tabular + CNN Models")
+st.title("Cervical Cancer Risk Prediction App")
 
-# -------------------------------
-# Load Tabular Model and Scaler
-# -------------------------------
-with open("tabular_model.joblib", "rb") as f:
-    tabular_model = joblib.load(f)
+# =========================
+# Load Tabular Model
+# =========================
+@st.cache_resource
+def load_tabular():
+    model = joblib.load("tabular_model.joblib")
+    scaler = joblib.load("scaler.joblib")
+    return model, scaler
 
-with open("scaler.joblib", "rb") as f:
-    scaler = joblib.load(f)
+tabular_model, scaler = load_tabular()
 
-# -------------------------------
-# Define Features
-# -------------------------------
-feature_names = ['Age', 'Number of sexual partners', 'First sexual intercourse', 
-                 'Num of pregnancies', 'Smokes', 'Smokes (years)', 'Smokes (packs/year)',
-                 'Hormonal Contraceptives', 'Hormonal Contraceptives (years)', 'IUD', 
-                 'IUD (years)', 'STDs', 'STDs (number)', 'STDs:condylomatosis',
-                 'STDs:cervical condylomatosis', 'STDs:vaginal condylomatosis',
-                 'STDs:vulvo-perineal condylomatosis', 'STDs:syphilis',
-                 'STDs:pelvic inflammatory disease', 'STDs:genital herpes',
-                 'STDs:molluscum contagiosum', 'STDs:AIDS', 'STDs:HIV',
-                 'STDs:Hepatitis B', 'STDs:HPV', 'STDs: Number of diagnosis',
-                 'STDs: Time since first diagnosis', 'STDs: Time since last diagnosis']
+# =========================
+# Load CNN Model (EfficientNet)
+# =========================
+@st.cache_resource
+def load_cnn():
+    model = models.efficientnet_b0(pretrained=False)
 
-# Features we ask the user for
+    model.classifier = nn.Sequential(
+        nn.Dropout(0.4),
+        nn.Linear(model.classifier[1].in_features, 4)
+    )
+
+    model.load_state_dict(torch.load("cnn_weights.pth", map_location="cpu"))
+    model.eval()
+    return model
+
+cnn_model = load_cnn()
+
+# =========================
+# Feature List (IMPORTANT)
+# =========================
+feature_names = [
+    'Age', 'Number of sexual partners', 'First sexual intercourse', 
+    'Num of pregnancies', 'Smokes', 'Smokes (years)', 'Smokes (packs/year)',
+    'Hormonal Contraceptives', 'Hormonal Contraceptives (years)', 'IUD', 
+    'IUD (years)', 'STDs', 'STDs (number)', 'STDs:condylomatosis',
+    'STDs:cervical condylomatosis', 'STDs:vaginal condylomatosis',
+    'STDs:vulvo-perineal condylomatosis', 'STDs:syphilis',
+    'STDs:pelvic inflammatory disease', 'STDs:genital herpes',
+    'STDs:molluscum contagiosum', 'STDs:AIDS', 'STDs:HIV',
+    'STDs:Hepatitis B', 'STDs:HPV', 'STDs: Number of diagnosis',
+    'STDs: Time since first diagnosis', 'STDs: Time since last diagnosis'
+]
+
+# =========================
+# User Input (only important ones)
+# =========================
+st.subheader("Enter Patient Information")
+
 user_features = {
     "Age": "Age",
     "Number of sexual partners": "Number of sexual partners",
     "First sexual intercourse": "First sexual intercourse",
     "Num of pregnancies": "Num of pregnancies",
     "Hormonal Contraceptives": "Hormonal Contraceptives",
-    "STDs: HIV": "STDs:HIV",
-    "IUD (years)": "IUD (years)"
+    "STDs: HIV": "STDs:HIV"
 }
 
-# -------------------------------
-# Collect Tabular User Input
-# -------------------------------
-st.subheader("Enter your information")
-user_input_data = {}
-for label, col_name in user_features.items():
-    user_input_data[col_name] = st.text_input(label, "0")
+user_data = {}
+for label, col in user_features.items():
+    user_data[col] = st.number_input(label, min_value=0, value=0)
 
-# Convert to numeric and fill missing features
-user_input_df = pd.DataFrame([user_input_data]).apply(pd.to_numeric, errors='coerce').fillna(0)
+# Convert to DataFrame
+input_df = pd.DataFrame([user_data])
+
+# Fill missing features with 0
 for feature in feature_names:
-    if feature not in user_input_df.columns:
-        user_input_df[feature] = 0
+    if feature not in input_df.columns:
+        input_df[feature] = 0
 
-user_input_df = user_input_df[feature_names]
+# Reorder columns
+input_df = input_df[feature_names]
 
-# -------------------------------
+# =========================
 # Tabular Prediction
-# -------------------------------
-input_scaled = scaler.transform(user_input_df)
-tabular_pred = tabular_model.predict(input_scaled)
-tabular_proba = tabular_model.predict_proba(input_scaled)[0][1]  # probability of high risk
+# =========================
+scaled_input = scaler.transform(input_df)
+tabular_prob = tabular_model.predict_proba(scaled_input)[0][1]
 
-st.subheader("Tabular Model Prediction")
-st.write(f"Tabular Risk: {'High Risk' if tabular_proba > 0.45 else 'Low Risk'}")
-st.write(f"Probability: {tabular_proba:.2f}")
+st.subheader("Tabular Model Result")
+st.write(f"Probability: {tabular_prob:.2f}")
 
-# -------------------------------
-# CNN Image Prediction
-# -------------------------------
-st.subheader("Upload Image for CNN Prediction")
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+# =========================
+# CNN Prediction (Image)
+# =========================
+st.subheader("Upload Pap Smear Image")
+
+uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+
+cnn_prob = 0.0  # default
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    # Preprocess image
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
-        transforms.ToTensor()
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406],
+                             [0.229, 0.224, 0.225])
     ])
-    image_tensor = transform(image).unsqueeze(0)  # add batch dimension
 
-    # Load CNN model
-    cnn_model = torch.load("cnn_weights.pth", map_location=torch.device('cpu'), weights_only=False)
-    cnn_model.eval()
+    image_tensor = transform(image).unsqueeze(0)
 
     with torch.no_grad():
-        cnn_output = cnn_model(image_tensor)
-        cnn_proba = torch.sigmoid(cnn_output).item()  # probability of high risk
+        output = cnn_model(image_tensor)
+        probs = F.softmax(output, dim=1)
 
-    st.subheader("CNN Model Prediction")
-    st.write(f"CNN Risk: {'High Risk' if cnn_proba > 0.45 else 'Low Risk'}")
-    st.write(f"Probability: {cnn_proba:.2f}")
+        # Cancer-related probability (same logic as your notebook)
+        cnn_prob = (probs[:, 0] + probs[:, 1]).item()
 
-    # -------------------------------
-    # Combined Prediction
-    # -------------------------------
-    final_risk_score = 0.6 * tabular_proba + 0.4 * cnn_proba
-    combined_risk = "High Risk" if final_risk_score > 0.45 else "Low Risk"
+    st.subheader("CNN Model Result")
+    st.write(f"Probability: {cnn_prob:.2f}")
 
-    st.subheader("Combined Prediction")
-    st.write(f"Overall Risk: {combined_risk}")
-    st.write(f"Combined Risk Score: {final_risk_score:.2f}")
+# =========================
+# FINAL MULTIMODAL PREDICTION
+# =========================
+final_score = 0.6 * tabular_prob + 0.4 * cnn_prob
+
+risk = "High Risk" if final_score > 0.45 else "Low Risk"
+
+st.subheader("Final Risk Prediction")
+st.write(risk)
+st.write(f"Final Risk Score: {final_score:.2f}")
