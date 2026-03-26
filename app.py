@@ -133,7 +133,7 @@ if st.sidebar.button("🔍 Predict Risk"):
         # -------------------------
         # FINAL SCORE
         # -------------------------
-        Final Score = 0.5 × Tabular + 0.5 × CNN
+        Final Score = 0.5 * Tabular + 0.5 * CNN
 
         # -------------------------
         # DISPLAY RESULTS
